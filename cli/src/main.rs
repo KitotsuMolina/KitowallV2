@@ -791,8 +791,12 @@ fn run_watch(args: &[String]) -> Result<(), String> {
     let once = args.iter().any(|argument| argument == "--once");
     let namespace = option_value(args, "--namespace").unwrap_or("kitowall");
     let gateway = CompositorGateway::from_environment();
-    let mut previous = Vec::new();
+    let mut previous = gateway.outputs()?;
+    if once {
+        return Ok(());
+    }
     loop {
+        thread::sleep(Duration::from_millis(poll_ms));
         let outputs = gateway.outputs()?;
         if outputs != previous {
             let next_args = vec![
@@ -803,10 +807,6 @@ fn run_watch(args: &[String]) -> Result<(), String> {
             run_next("next", &next_args)?;
             previous = outputs;
         }
-        if once {
-            return Ok(());
-        }
-        thread::sleep(Duration::from_millis(poll_ms));
     }
 }
 
@@ -1147,13 +1147,13 @@ fn automation_intents(
             command: vec![
                 compositor.into(),
                 "wallpaper".into(),
-                "start".into(),
+                "serve".into(),
                 "--namespace".into(),
                 namespace.into(),
                 "--contract-v1".into(),
             ],
-            kind: "one_shot".into(),
-            restart: "no".into(),
+            kind: "daemon".into(),
+            restart: "on-failure".into(),
             autostart: true,
             schedule: None,
         },
@@ -1171,7 +1171,7 @@ fn automation_intents(
             restart: "no".into(),
             autostart: false,
             schedule: Some(AutomationSchedule {
-                startup_delay_seconds: 2,
+                startup_delay_seconds: every_seconds,
                 every_seconds,
             }),
         },
@@ -1201,7 +1201,7 @@ fn automation_intents(
                 namespace.into(),
             ],
             kind: "one_shot".into(),
-            restart: "no".into(),
+            restart: "on-failure".into(),
             autostart: true,
             schedule: None,
         },
@@ -3174,12 +3174,21 @@ mod tests {
         );
         assert_eq!(intents.len(), 4);
         assert_eq!(intents[0].id, "kitowall-runtime");
+        assert_eq!(intents[0].kind, "daemon");
+        assert_eq!(intents[0].command[2], "serve");
         assert_eq!(intents[1].id, "kitowall-next");
         assert_eq!(intents[2].id, "kitowall-watch");
         assert_eq!(intents[3].id, "kitowall-login-apply");
+        assert_eq!(
+            intents[1].schedule.as_ref().unwrap().startup_delay_seconds,
+            600
+        );
         assert_eq!(intents[1].schedule.as_ref().unwrap().every_seconds, 600);
         assert_eq!(intents[2].kind, "daemon");
         assert!(intents[2].autostart);
+        assert_eq!(intents[0].restart, "on-failure");
+        assert_eq!(intents[2].restart, "on-failure");
+        assert_eq!(intents[3].restart, "on-failure");
         let request = AutomationBatchIntent {
             schema_version: 1,
             automations: intents,
