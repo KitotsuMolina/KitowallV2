@@ -60,6 +60,11 @@ forzarse en cualquier build. Kitowall busca
 `KITSUNE_COMPOSITOR_BIN` mantiene prioridad. Kitowall no ejecuta `awww`, `swww`,
 `hyprctl` ni `niri` directamente.
 
+Cuando `next` o `rotate-now` se ejecutan sin `--pack`, la rotacion avanza en
+round-robin por todos los packs configurados. Si existe un pool habilitado se usa
+su mezcla ponderada. `--pack <name>` es la unica forma de fijar una ejecucion a un
+pack concreto.
+
 Un build `--release` sin `--lc` resuelve `kitsune-compositor` mediante `PATH`.
 
 `wallpaper list` es el primer contrato dedicado al frontend: pagina un catalogo normalizado sin hacer red ni descargar archivos. Conserva previews, metadata, favorito, hidratacion y outputs activos. `wallpaper apply` solo acepta un ID emitido para el pack indicado, valida el output mediante el compositor, hidrata bajo demanda y persiste estado/historial despues de aplicar correctamente.

@@ -167,7 +167,13 @@ fn choose_pack(
         return Ok("pool".into());
     }
     if let Some(current) = current.filter(|name| config.packs.contains_key(*name)) {
-        return Ok(current.into());
+        return config
+            .packs
+            .keys()
+            .find(|name| name.as_str() > current)
+            .or_else(|| config.packs.keys().next())
+            .cloned()
+            .ok_or_else(|| "no packs configured".into());
     }
     config
         .packs
@@ -325,6 +331,32 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("kitowall-library-{name}-{id}"))
+    }
+
+    #[test]
+    fn automatic_rotation_advances_between_configured_packs() {
+        let mut config = Config::default();
+        config.packs.insert(
+            "edge-runners".into(),
+            PackConfig::Local {
+                paths: vec!["/edge".into()],
+            },
+        );
+        config.packs.insert(
+            "sao".into(),
+            PackConfig::Local {
+                paths: vec!["/sao".into()],
+            },
+        );
+
+        assert_eq!(
+            choose_pack(&config, None, Some("sao")).unwrap(),
+            "edge-runners"
+        );
+        assert_eq!(
+            choose_pack(&config, None, Some("edge-runners")).unwrap(),
+            "sao"
+        );
     }
 
     #[test]
