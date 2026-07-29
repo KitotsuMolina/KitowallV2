@@ -4,6 +4,11 @@ Logica de biblioteca estatica, providers, previews, seleccion, historial, aplica
 
 El workspace Rust inicial ya contiene configuracion JSON v1 compatible con TypeScript, los seis tipos de pack, validacion, estado persistente, cooldowns y seleccion multi-output. Tambien incluye CRUD de catalogo y el provider local recursivo con previews de imagen schema v1.
 
+Cada aplicacion estatica realizada por el runtime del compositor registra
+automaticamente la ruta activa por output. Kitowall no escribe ni conoce el
+archivo compartido `active-media`; consume exclusivamente el contrato del
+compositor.
+
 Los seis providers historicos estan migrados: `local`, `static_url`, `wallhaven`, `reddit`, `unsplash` y `generic_json`. Los remotos generan indices y previews compatibles y pueden hidratar mediante un `HttpTransport` inyectable con limite de 100 MiB, escritura temporal, rename atomico, validacion de pertenencia del candidato y rollback si falla el indice de cache.
 
 El transporte de produccion usa `ureq` 3 con Rustls, timeout global de 30 segundos, conexion de 5 segundos, cuerpo de 20 segundos, maximo de cinco redirecciones y dos reintentos para fallos/transitorios HTTP. Solo acepta URL `http://` o `https://`; si el servidor declara `Content-Type`, debe ser `image/*`.
