@@ -1,0 +1,332 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kitotsu.dev/schemas/distribution/release-artifact-v1.schema.json",
+  "title": "Kitotsu release artifact manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "distribution_contract",
+    "product",
+    "release",
+    "platform",
+    "artifact",
+    "payload",
+    "entrypoints",
+    "requirements",
+    "integrations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "kitotsu.release-artifact"
+    },
+    "distribution_contract": {
+      "const": "1.0"
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "license", "repository"],
+      "properties": {
+        "id": {
+          "enum": [
+            "kitowall",
+            "kilivepaper",
+            "kitsune",
+            "kitsune-compositor",
+            "kiui"
+          ]
+        },
+        "version": {
+          "$ref": "#/$defs/semver"
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "$ref": "#/$defs/github_repository"
+        },
+        "contract_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+$"
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag", "channel"],
+      "properties": {
+        "tag": {
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+        },
+        "channel": {
+          "enum": ["stable", "beta", "nightly"]
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "arch", "target", "libc"],
+      "properties": {
+        "os": {
+          "const": "linux"
+        },
+        "arch": {
+          "enum": ["x86_64", "aarch64"]
+        },
+        "target": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]+$"
+        },
+        "libc": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["family"],
+          "properties": {
+            "family": {
+              "enum": ["glibc", "musl"]
+            },
+            "minimum": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+$"
+            }
+          }
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_name", "format", "size_bytes", "sha256"],
+      "properties": {
+        "file_name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]+\\.tar\\.zst$"
+        },
+        "format": {
+          "const": "tar.zst"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "payload": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "kind", "mode", "size_bytes", "sha256"],
+        "properties": {
+          "path": {
+            "$ref": "#/$defs/relative_path"
+          },
+          "kind": {
+            "enum": [
+              "executable",
+              "library",
+              "resource",
+              "desktop-entry-template",
+              "icon",
+              "completion",
+              "license",
+              "migration"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "pattern": "^0[0-7]{3}$"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "entrypoints": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "path"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          },
+          "path": {
+            "$ref": "#/$defs/relative_path"
+          }
+        }
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modules", "host_capabilities"],
+      "properties": {
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "constraint", "optional"],
+            "properties": {
+              "id": {
+                "enum": [
+                  "kitowall",
+                  "kilivepaper",
+                  "kitsune",
+                  "kitsune-compositor",
+                  "kiui"
+                ]
+              },
+              "constraint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "optional": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "host_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "optional"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$"
+              },
+              "constraint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "optional": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "integrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["desktop_entries"],
+      "properties": {
+        "desktop_entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "application_id",
+              "template",
+              "entrypoint",
+              "icons"
+            ],
+            "properties": {
+              "application_id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*){2,}$"
+              },
+              "template": {
+                "$ref": "#/$defs/relative_path"
+              },
+              "entrypoint": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]*$"
+              },
+              "icons": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["source", "theme", "size", "format"],
+                  "properties": {
+                    "source": {
+                      "$ref": "#/$defs/relative_path"
+                    },
+                    "theme": {
+                      "const": "hicolor"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "enum": [48, 64, 128, 256, 512]
+                    },
+                    "format": {
+                      "const": "png"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "sbom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_name", "format", "sha256"],
+      "properties": {
+        "file_name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]+\\.spdx\\.json$"
+        },
+        "format": {
+          "const": "spdx-json"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "github_repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "relative_path": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9_.+-]+(?:/[A-Za-z0-9_.+ -]+)*$"
+    }
+  }
+}

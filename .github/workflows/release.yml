@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TARGET: x86_64-unknown-linux-gnu
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Configure Rust stable
+        run: |
+          rustup update stable --no-self-update
+          rustup default stable
+          rustup component add clippy rustfmt
+          rustup target add "$TARGET"
+
+      - name: Install release tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes jq zstd pipx
+
+      - name: Verify tag and version
+        id: version
+        run: |
+          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)"
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]
+          test "$GITHUB_REF_NAME" = "v$version"
+          echo "VERSION=$version" >>"$GITHUB_ENV"
+          echo "value=$version" >>"$GITHUB_OUTPUT"
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace --locked
+
+      - name: Build release binary
+        run: cargo build --locked --release --target "$TARGET" -p kitowall-cli
+
+      - name: Package deterministic archive
+        run: scripts/package-release.sh
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          file: dist/kitowall-${{ steps.version.outputs.value }}-${{ env.TARGET }}.tar.zst
+          format: spdx-json
+          output-file: dist/kitowall-${{ steps.version.outputs.value }}-${{ env.TARGET }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Generate and validate manifest
+        env:
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          scripts/generate-release-manifest.sh
+          pipx run --spec check-jsonschema==0.37.4 check-jsonschema \
+            --schemafile distribution/release-artifact-v1.schema.json \
+            "dist/kitowall-${VERSION}-${TARGET}.manifest.json"
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum \
+            "kitowall-${VERSION}-${TARGET}.tar.zst" \
+            "kitowall-${VERSION}-${TARGET}.manifest.json" \
+            "kitowall-${VERSION}-${TARGET}.spdx.json" \
+            >SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4
+        with:
+          subject-path: dist/*.tar.zst
+
+      - name: Attest SBOM
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4
+        with:
+          subject-path: dist/*.tar.zst
+          sbom-path: dist/*.spdx.json
+
+      - name: Preserve workflow artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: kitowall-${{ github.ref_name }}-${{ env.TARGET }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --generate-notes \
+            --title "Kitowall $GITHUB_REF_NAME" \
+            dist/*.tar.zst \
+            dist/*.manifest.json \
+            dist/*.spdx.json \
+            dist/SHA256SUMS
