@@ -3040,12 +3040,19 @@ mod tests {
 
     #[test]
     fn finds_the_refactor_root_from_the_local_target_tree() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(Path::parent)
-            .unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "kitowall-refactor-root-{}-{}",
+            std::process::id(),
+            current_time_ms().unwrap()
+        ));
+        for project in ["kitowall", "compositor", "kiui"] {
+            let directory = root.join(project);
+            std::fs::create_dir_all(&directory).unwrap();
+            std::fs::write(directory.join("Cargo.toml"), b"[workspace]\n").unwrap();
+        }
         let nested = root.join("kitowall/target/debug");
         assert_eq!(find_refactor_root(&nested), Some(root.to_path_buf()));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
