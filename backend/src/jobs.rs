@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -115,7 +116,7 @@ impl JobStore {
                 serde_json::from_slice::<JobRecord>(&fs::read(entry.path()).ok()?).ok()
             })
             .collect::<Vec<_>>();
-        records.sort_by(|left, right| right.created_at_unix_ms.cmp(&left.created_at_unix_ms));
+        records.sort_by_key(|record| Reverse(record.created_at_unix_ms));
         Ok(records)
     }
 
